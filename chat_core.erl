@@ -45,6 +45,12 @@ loop(Peers) ->
             ),
             loop(Peers);
 
+        %% Señal recibida desde rbeacon con el nombre del nodo remoto
+        {beacon_seen, IP, NodeBin} ->
+            connect_announced(NodeBin),
+            self() ! {beacon_seen, IP},
+            loop(Peers);
+
         %% Señal recibida desde rbeacon
         {beacon_seen, IP} ->
             Now = erlang:system_time(second),
@@ -72,6 +78,19 @@ loop(Peers) ->
 
         _Other ->
             loop(Peers)
+    end.
+
+%% Conecta con el nodo que se anunció por UDP (sirve entre PCs distintas)
+connect_announced(NodeBin) ->
+    case binary:split(NodeBin, <<"@">>) of
+        [Name, Host] when Name =/= <<>>, Host =/= <<>> ->
+            Node = binary_to_atom(NodeBin, utf8),
+            case Node =:= node() orelse lists:member(Node, nodes()) of
+                true -> ok;
+                false -> net_adm:ping(Node)
+            end;
+        _ ->
+            ok
     end.
 
 %% Intenta conectarse a los nodos según el entorno

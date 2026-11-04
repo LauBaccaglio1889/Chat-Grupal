@@ -47,10 +47,17 @@ init(CallbackPid, Cookie) ->
 loop(InSocket, OutSocket, CallbackPid, Cookie) ->
     receive
         broadcast ->
-            _ = gen_udp:send(OutSocket, {255, 255, 255, 255}, ?PORT, <<"announcement">>),
+            %% El anuncio lleva el nombre del nodo para que otras PCs puedan conectarse
+            NodeBin = atom_to_binary(node(), utf8),
+            _ = gen_udp:send(OutSocket, {255, 255, 255, 255}, ?PORT, <<"announcement:", NodeBin/binary>>),
             erlang:send_after(?INTERVAL, self(), broadcast),
             loop(InSocket, OutSocket, CallbackPid, Cookie);
 
+        {udp, InSocket, IP, _InPortNo, <<"announcement:", NodeBin/binary>>} ->
+            CallbackPid ! {beacon_seen, IP, NodeBin},
+            loop(InSocket, OutSocket, CallbackPid, Cookie);
+
+        %% Formato viejo, sin nombre de nodo
         {udp, InSocket, IP, _InPortNo, <<"announcement">>} ->
             CallbackPid ! {beacon_seen, IP},
             loop(InSocket, OutSocket, CallbackPid, Cookie);
